@@ -1,0 +1,31 @@
+query Page {
+	pages {
+		id
+		featured_image {
+			id
+			title
+			description
+			height
+			width
+		}
+		page_title
+		page_slug
+		page_description
+		hero_title
+		hero_message
+		hero_link
+	}
+	products(filter: { categories: { categories_id: { slug: { _eq: "featured" } } } }) {
+		id
+		description
+		name
+		price
+		slug
+		status
+		image {
+			id
+			title
+			description
+		}
+	}
+}

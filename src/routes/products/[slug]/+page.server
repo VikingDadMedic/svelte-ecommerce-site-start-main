@@ -1,0 +1,73 @@
+import { PUBLIC_DIRECTUS_PROJECT_URL } from '$env/static/public';
+import type { ProductQuery } from '$lib/generated/graphql';
+import query from '$lib/graphql/query/product.graphql?raw';
+import { getBase64Placeholder } from '$lib/utilities/image';
+import { error } from '@sveltejs/kit';
+import invariant from 'tiny-invariant';
+import type { PageServerLoad } from './$types';
+
+export const load: PageServerLoad = async function ({ params }) {
+	try {
+		const { slug } = params;
+
+		const response = await fetch(`${PUBLIC_DIRECTUS_PROJECT_URL}/graphql`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json'
+			},
+			body: JSON.stringify({ query, variables: { slug } })
+		});
+
+		const {
+			data: { products }
+		}: { data: ProductQuery } = await response.json();
+		const [product] = products;
+		const {
+			categories: rawCategories,
+			description,
+			gtin,
+			id,
+			image: rawImage,
+			name,
+			price,
+			sku
+		} = product;
+
+		invariant(
+			description && name && price && slug && rawCategories && rawImage,
+			`${slug} product description, name, price, slug, categories and image are required`
+		);
+
+		const categories = rawCategories
+			?.map((element) => {
+				invariant(element, `Product has empty categories element`);
+				const { categories_id } = element;
+				invariant(categories_id, `Product categories element missing categoryID`);
+				const { name, slug } = categories_id;
+				invariant(name && slug, `CategoryID: ${categories_id} name  and slug are required`);
+				return { name, slug };
+			})
+
+		const { description: alt, id: imageId } = rawImage;
+		invariant(alt && imageId, `Product: ${slug} image description is required`);
+		const placeholder = await getBase64Placeholder({ id });
+
+		return {
+			categories,
+			description,
+			gtin: gtin ?? undefined,
+			id,
+			image: { alt, id: imageId, placeholder },
+			name,
+			price,
+			slug,
+			sku: sku ?? undefined
+		};
+	} catch (err: unknown) {
+		const httpError = err as { status: number; message: string };
+		if (httpError.message) {
+			throw error(httpError.status ?? 500, httpError.message);
+		}
+		throw error(500, err as string);
+	}
+};

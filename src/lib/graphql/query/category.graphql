@@ -1,0 +1,18 @@
+query Category($slug: String!) {
+	categories {
+		name
+		slug
+	}
+	products(filter: { categories: { categories_id: { slug: { _eq: $slug } } } }) {
+		id
+		description
+		name
+		price
+		status
+		image {
+			id
+			title
+			description
+		}
+	}
+}

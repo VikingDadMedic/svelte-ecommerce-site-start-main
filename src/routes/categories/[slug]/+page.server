@@ -1,0 +1,59 @@
+import { PUBLIC_DIRECTUS_PROJECT_URL } from '$env/static/public';
+import type { CategoryQuery } from '$lib/generated/graphql';
+import query from '$lib/graphql/query/category.graphql?raw';
+import { getBase64Placeholder } from '$lib/utilities/image';
+import { error } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
+import invariant from 'tiny-invariant';
+
+export const load: PageServerLoad = async function ({ params }) {
+	try {
+		const { slug } = params;
+
+		const response = await fetch(`${PUBLIC_DIRECTUS_PROJECT_URL}/graphql`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json'
+			},
+			body: JSON.stringify({ query, variables: { slug } })
+		});
+		const {
+			data: { categories: rawCategories, products: rawProducts }
+		}: { data: CategoryQuery } = await response.json();
+		const { name } = rawCategories.find(({ slug: categorySlug }) => categorySlug === slug) ?? {};
+		invariant(name, `Category: ${slug} name is required`);
+		const products = await Promise.all(
+			rawProducts.map(async ({ description, id, image, name, price, slug }) => {
+				invariant(
+					description && name && price && slug && image,
+					`${slug} product description, name, price, slug and image are required`
+				);
+				const { id: imageId, description: alt } = image;
+				invariant(imageId && alt, `${slug} id and description are required for prodcut image`);
+				return {
+					id,
+					imageId,
+					alt,
+					name,
+					price,
+					slug,
+					description,
+					placeholder: await getBase64Placeholder({ id: imageId })
+				};
+			})
+		);
+		const categories = rawCategories
+			?.map(({ name, slug }) => {
+				invariant(name && slug, `Category: ${slug} name is required`);
+				return { name, slug };
+			})
+			.sort((a, b) => a.name?.localeCompare(b.name));
+		return { categories, name, products };
+	} catch (err: unknown) {
+		const httpError = err as { status: number; message: string };
+		if (httpError.message) {
+			throw error(httpError.status ?? 500, httpError.message);
+		}
+		throw error(500, err as string);
+	}
+};

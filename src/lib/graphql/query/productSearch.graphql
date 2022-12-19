@@ -1,0 +1,34 @@
+query ProductsSearch($query: String!) {
+	products(
+		filter: {
+			_and: [
+				{
+					_or: [
+						{ name: { _contains: $query } }
+						{ description: { _contains: $query } }
+						{ image: { description: { _contains: $query } } }
+						{ categories: { categories_id: { name: { _contains: $query } } } }
+					]
+				}
+			]
+		}
+		limit: 10
+	) {
+		id
+		description
+		name
+		price
+		slug
+		categories {
+			categories_id {
+				name
+				slug
+			}
+		}
+		image {
+			id
+			title
+			description
+		}
+	}
+}
